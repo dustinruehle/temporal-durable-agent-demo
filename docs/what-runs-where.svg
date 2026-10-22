@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" role="img" aria-label="What runs where: the dashboard, gateway, harnesses and Worker run on your machine or in your AWS account; the session Workflow, Task Queues and Event History live in Temporal.">
+  <title>Durable agent demo: what runs where</title>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B1A9C2"/>
+    </marker>
+    <marker id="ahv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8E6BE6"/>
+    </marker>
+    <style>
+      .h1{font-family:Georgia,'Times New Roman',serif;font-size:34px;font-weight:600;fill:#ECE8F3}
+      .sub{font-size:18px;fill:#B1A9C2}
+      .eyebrow{font-family:Menlo,Consolas,'DejaVu Sans Mono',monospace;font-size:14px;letter-spacing:1.5px;fill:#A68BEE}
+      .bt{font-size:19px;font-weight:600;fill:#ECE8F3}
+      .bl{font-size:15px;fill:#B1A9C2}
+      .mono{font-family:Menlo,Consolas,'DejaVu Sans Mono',monospace;font-size:14px;fill:#ECE8F3}
+      .lab{font-size:14px;fill:#ECE8F3}
+      .labv{font-size:14px;fill:#C9B8F5}
+      .kill{font-size:15px;font-weight:600;fill:#F0805E}
+      .ok{font-size:15px;font-weight:600;fill:#5FBE97}
+      .amber{font-size:15px;fill:#E9B23A}
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="#15111D"/>
+
+  <text x="48" y="62" class="h1">Durable agent demo: what runs where</text>
+  <text x="48" y="96" class="sub">The Worker runs on your machine or in your AWS account. The session and its state live in Temporal.</text>
+
+  <!-- LEFT: your side -->
+  <rect x="40" y="130" width="960" height="590" rx="14" fill="#1A1524" stroke="#4A4060" stroke-width="2"/>
+  <text x="66" y="162" class="eyebrow">YOUR MACHINE OR YOUR AWS ACCOUNT</text>
+
+  <rect x="70" y="190" width="400" height="100" rx="10" fill="#1E1828" stroke="#5A5368" stroke-width="1.5"/>
+  <text x="92" y="222" class="bt">Dashboard :8080</text>
+  <text x="92" y="248" class="bl">PLATFORM and WORKER lanes</text>
+  <text x="92" y="270" class="bl">Send as customer, Approve the handoff</text>
+
+  <rect x="70" y="310" width="400" height="100" rx="10" fill="#1E1828" stroke="#5A5368" stroke-width="1.5"/>
+  <text x="92" y="342" class="bt">Channel gateway :8090</text>
+  <text x="92" y="368" class="bl">POST /inbound: customer messages in</text>
+  <text x="92" y="390" class="bl">POST /outbound: agent messages out (stub)</text>
+
+  <rect x="70" y="430" width="400" height="120" rx="10" fill="#1E1828" stroke="#5A5368" stroke-width="1.5"/>
+  <text x="92" y="462" class="bt">In-memory harnesses, for contrast</text>
+  <text x="92" y="488" class="bl">:8091 plain process, memory in RAM</text>
+  <text x="92" y="510" class="bl">:8092 one call as a Standalone Activity</text>
+  <text x="92" y="532" class="bl">Not part of the durable session</text>
+
+  <!-- Worker -->
+  <rect x="540" y="430" width="430" height="270" rx="12" fill="#2A1A1E" stroke="#F0805E" stroke-width="2.5"/>
+  <text x="562" y="462" class="bt">Worker · scripts/worker.py</text>
+  <text x="562" y="486" class="kill">Killed on purpose in beats 2 and 4</text>
+  <rect x="562" y="502" width="386" height="104" rx="8" fill="#1E1828" stroke="#5A5368"/>
+  <text x="578" y="526" class="mono">polls agent-session</text>
+  <text x="578" y="550" class="bl">Session Workflow code</text>
+  <text x="578" y="572" class="bl">Tool Activities: check_inventory, financing,</text>
+  <text x="578" y="594" class="bl">inspection (mock data), send_customer_message</text>
+  <rect x="562" y="616" width="386" height="56" rx="8" fill="#1E1828" stroke="#5A5368"/>
+  <text x="578" y="640" class="mono">polls model-calls</text>
+  <text x="578" y="662" class="bl">invoke_model Activity</text>
+
+  <!-- Model -->
+  <rect x="540" y="760" width="430" height="100" rx="12" fill="#1E1828" stroke="#5A5368" stroke-width="1.5"/>
+  <text x="562" y="794" class="bt">Amazon Bedrock (or mock)</text>
+  <text x="562" y="820" class="bl">The model. In mock mode it runs inside</text>
+  <text x="562" y="842" class="bl">the Worker; nothing else changes.</text>
+
+  <text x="70" y="770" class="eyebrow">LEGEND</text>
+  <rect x="70" y="786" width="22" height="16" rx="3" fill="#2A1A1E" stroke="#F0805E" stroke-width="2"/>
+  <text x="102" y="800" class="lab">Process you kill in the demo</text>
+  <rect x="70" y="814" width="22" height="16" rx="3" fill="#1E1530" stroke="#8E6BE6" stroke-width="2"/>
+  <text x="102" y="828" class="lab">Temporal: survives every kill</text>
+  <line x1="70" y1="850" x2="92" y2="850" stroke="#8E6BE6" stroke-width="2.5"/>
+  <text x="102" y="855" class="lab">Worker connects out; no inbound ports</text>
+
+  <!-- RIGHT: Temporal -->
+  <rect x="1140" y="130" width="420" height="730" rx="14" fill="#1E1530" stroke="#8E6BE6" stroke-width="2"/>
+  <text x="1164" y="160" class="eyebrow">TEMPORAL CLOUD OR SELF-HOSTED</text>
+  <text x="1164" y="180" class="eyebrow">YOUR NAMESPACE</text>
+
+  <rect x="1164" y="196" width="372" height="320" rx="10" fill="#2A2140" stroke="#8E6BE6" stroke-width="1.5"/>
+  <text x="1184" y="228" class="bt">Session Workflow</text>
+  <text x="1184" y="252" class="bl">Workflow Id = conversation id</text>
+  <text x="1184" y="288" class="lab">Event History: every turn and</text>
+  <text x="1184" y="308" class="lab">every Activity result</text>
+  <text x="1184" y="344" class="amber">Durable Timer: a follow-up due</text>
+  <text x="1184" y="364" class="amber">hours or days later</text>
+  <text x="1184" y="400" class="lab">Waits on a Signal for the</text>
+  <text x="1184" y="420" class="lab">human handoff (no timeout)</text>
+  <text x="1184" y="456" class="ok">Survives every Worker kill;</text>
+  <text x="1184" y="478" class="ok">the same Workflow Id and Run Id</text>
+  <text x="1184" y="500" class="ok">resume on a fresh Worker</text>
+
+  <rect x="1164" y="536" width="372" height="130" rx="10" fill="#2A2140" stroke="#8E6BE6" stroke-width="1.5"/>
+  <text x="1184" y="568" class="bt">Task Queues</text>
+  <text x="1184" y="600" class="mono">agent-session</text>
+  <text x="1184" y="626" class="mono">model-calls</text>
+  <text x="1184" y="652" class="bl">Rename with TASK_QUEUE_AGENT / _MODEL</text>
+
+  <rect x="1164" y="686" width="372" height="150" rx="10" fill="#2A2140" stroke="#8E6BE6" stroke-width="1.5"/>
+  <text x="1184" y="718" class="bt">Temporal UI</text>
+  <text x="1184" y="746" class="bl">Event History, pending Timers,</text>
+  <text x="1184" y="768" class="bl">the handoff Signal with its</text>
+  <text x="1184" y="790" class="bl">approver and time</text>
+
+  <!-- Arrows -->
+  <line x1="470" y1="240" x2="1162" y2="240" stroke="#B1A9C2" stroke-width="2" marker-end="url(#ah)"/>
+  <text x="560" y="230" class="lab">Describe, Query, Signal (Approve the handoff)</text>
+  <line x1="200" y1="290" x2="200" y2="308" stroke="#B1A9C2" stroke-width="2" marker-end="url(#ah)"/>
+  <line x1="470" y1="360" x2="1162" y2="360" stroke="#B1A9C2" stroke-width="2" marker-end="url(#ah)"/>
+  <text x="560" y="350" class="lab">Signal-With-Start: one per customer message</text>
+  <path d="M540,470 L505,470 L505,395 L472,395" fill="none" stroke="#B1A9C2" stroke-width="2" marker-end="url(#ah)"/>
+  <text x="560" y="420" class="lab">send_customer_message posts outbound</text>
+  <line x1="970" y1="600" x2="1162" y2="600" stroke="#8E6BE6" stroke-width="3" marker-end="url(#ahv)"/>
+  <text x="982" y="584" class="labv">Polls both</text>
+  <text x="982" y="628" class="labv">Task Queues</text>
+  <line x1="755" y1="700" x2="755" y2="758" stroke="#B1A9C2" stroke-width="2" marker-end="url(#ah)"/>
+  <text x="768" y="736" class="lab">invoke_model</text>
+</svg>

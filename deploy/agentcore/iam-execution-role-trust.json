@@ -1,0 +1,15 @@
+{
+  "_comment": "Trust policy for the AgentCore Runtime execution role. Template: bin/render-iam.sh replaces PARTITION, REGION and ACCOUNT_ID and writes the result to out/. AgentCore assumes this role to run the container.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Service": "bedrock-agentcore.amazonaws.com" },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": { "aws:SourceAccount": "ACCOUNT_ID" },
+        "ArnLike": { "aws:SourceArn": "arn:PARTITION:bedrock-agentcore:REGION:ACCOUNT_ID:*" }
+      }
+    }
+  ]
+}

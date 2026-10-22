@@ -1,0 +1,14 @@
+# Keep the image small and free of local-only material.
+.venv
+.git
+.gitignore
+.env
+demo-spec
+tests
+docs
+deploy
+*.png
+*.log
+__pycache__
+.pytest_cache
+.ruff_cache

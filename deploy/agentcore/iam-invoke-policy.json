@@ -1,0 +1,14 @@
+{
+  "_comment": "Attach to whatever identity (a user, or the runtime shim's own caller) invokes the runtime. Template: bin/render-iam.sh replaces PARTITION, REGION and ACCOUNT_ID and writes the result to out/. StopRuntimeSession lets you end a session early to avoid idle cost.",
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:InvokeAgentRuntime",
+        "bedrock-agentcore:StopRuntimeSession"
+      ],
+      "Resource": "arn:PARTITION:bedrock-agentcore:REGION:ACCOUNT_ID:runtime/*"
+    }
+  ]
+}

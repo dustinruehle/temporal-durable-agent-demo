@@ -1,0 +1,8 @@
+{
+  "name": "happy",
+  "description": "Customer browses vehicles under a budget. The agent runs one inventory lookup and replies. This is the stage 2 happy path and the baseline for beats 1 and 2.",
+  "triggers": ["browse", "buy", "buying", "looking", "budget", "inventory", "hello", "hi"],
+  "fail_counts": {},
+  "follow_up": false,
+  "max_price": 15000
+}

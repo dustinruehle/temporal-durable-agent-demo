@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 880" width="1600" height="880" font-family="-apple-system, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" role="img" aria-label="AgentCore deployment: in your AWS account, AgentCore Runtime hosts an ephemeral Worker that connects out to Temporal and calls Amazon Bedrock; in Temporal, the session Workflow and Task Queues persist, and the Worker Controller Instance invokes the runtime when a Task waits.">
+  <title>AgentCore deployment: what runs where</title>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#B1A9C2"/>
+    </marker>
+    <marker id="ahv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8E6BE6"/>
+    </marker>
+    <marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#E9B23A"/>
+    </marker>
+    <style>
+      .h1{font-family:Georgia,'Times New Roman',serif;font-size:34px;font-weight:600;fill:#ECE8F3}
+      .sub{font-size:18px;fill:#B1A9C2}
+      .eyebrow{font-family:Menlo,Consolas,'DejaVu Sans Mono',monospace;font-size:14px;letter-spacing:1.5px;fill:#A68BEE}
+      .bt{font-size:19px;font-weight:600;fill:#ECE8F3}
+      .bl{font-size:15px;fill:#B1A9C2}
+      .mono{font-family:Menlo,Consolas,'DejaVu Sans Mono',monospace;font-size:14px;fill:#ECE8F3}
+      .lab{font-size:14px;fill:#ECE8F3}
+      .labv{font-size:14px;fill:#C9B8F5}
+      .laba{font-size:14px;fill:#E9B23A}
+      .ok{font-size:15px;font-weight:600;fill:#5FBE97}
+      .pill{font-size:12px;font-weight:700;fill:#15111D}
+    </style>
+  </defs>
+  <rect width="1600" height="880" fill="#15111D"/>
+
+  <text x="48" y="62" class="h1">AgentCore deployment: what runs where</text>
+  <text x="48" y="96" class="sub">No Worker runs between calls. Each invocation starts a Worker, runs the turn, and drains. The session stays in Temporal.</text>
+  <rect x="1352" y="72" width="200" height="30" rx="15" fill="#E9B23A"/>
+  <text x="1452" y="92" text-anchor="middle" class="pill">PRE-RELEASE</text>
+
+  <!-- LEFT: your AWS account -->
+  <rect x="40" y="130" width="960" height="710" rx="14" fill="#1A1524" stroke="#4A4060" stroke-width="2"/>
+  <text x="66" y="162" class="eyebrow">YOUR AWS ACCOUNT</text>
+
+  <rect x="70" y="186" width="300" height="104" rx="10" fill="#1E1828" stroke="#5A5368" stroke-width="1.5"/>
+  <text x="92" y="218" class="bt">Caller (optional)</text>
+  <text x="92" y="244" class="bl">aws bedrock-agentcore</text>
+  <text x="92" y="266" class="bl">invoke-agent-runtime, session id</text>
+
+  <!-- AgentCore Runtime -->
+  <rect x="440" y="186" width="520" height="480" rx="12" fill="#1E1828" stroke="#5A5368" stroke-width="2"/>
+  <text x="462" y="218" class="bt">AgentCore Runtime · microVM per session</text>
+  <text x="462" y="242" class="bl">Container from deploy/agentcore/Dockerfile (ARM64, PUBLIC network)</text>
+
+  <rect x="462" y="260" width="476" height="92" rx="8" fill="#1A1524" stroke="#5A5368"/>
+  <text x="478" y="286" class="lab">AgentCore SDK app · scripts/runtime.py, src/runtime/app.py</text>
+  <text x="478" y="310" class="mono">POST /invocations   GET /ping</text>
+  <text x="478" y="334" class="bl">/ping reports HealthyBusy during a turn, Healthy once it is idle</text>
+
+  <rect x="462" y="370" width="476" height="270" rx="10" fill="#2A1A1E" stroke="#F0805E" stroke-width="2.5"/>
+  <text x="482" y="400" class="bt">Ephemeral Worker, one per invocation</text>
+  <text x="482" y="426" class="mono">polls agent-session and model-calls</text>
+  <text x="482" y="456" class="bl">Session Workflow code</text>
+  <text x="482" y="478" class="bl">Tool Activities and the invoke_model Activity</text>
+  <text x="482" y="508" class="bl">Drains when the queue goes idle</text>
+  <text x="482" y="530" class="bl">(Activity tracker in src/runtime/idle.py)</text>
+  <text x="482" y="566" class="bl">Worker Versioning on when TEMPORAL_DEPLOYMENT_NAME</text>
+  <text x="482" y="588" class="bl">and TEMPORAL_BUILD_ID are set (needed for step 5)</text>
+  <text x="482" y="620" class="ok">AgentCore can reap the microVM; nothing is lost</text>
+
+  <!-- Bedrock -->
+  <rect x="440" y="716" width="520" height="100" rx="12" fill="#1E1828" stroke="#5A5368" stroke-width="1.5"/>
+  <text x="462" y="750" class="bt">Amazon Bedrock</text>
+  <text x="462" y="776" class="bl">The model. Called only from the invoke_model Activity,</text>
+  <text x="462" y="798" class="bl">with Botocore retries off so Temporal owns retries.</text>
+
+  <rect x="70" y="330" width="300" height="160" rx="10" fill="#1E1828" stroke="#5A5368" stroke-width="1.5"/>
+  <text x="92" y="362" class="bt">IAM roles you create</text>
+  <text x="92" y="388" class="bl">Execution role: AgentCore</text>
+  <text x="92" y="410" class="bl">runs the container with it</text>
+  <text x="92" y="440" class="bl">Invoke role: Temporal assumes</text>
+  <text x="92" y="462" class="bl">it, gated by your External ID</text>
+
+  <text x="70" y="770" class="eyebrow">LEGEND</text>
+  <rect x="70" y="786" width="22" height="16" rx="3" fill="#2A1A1E" stroke="#F0805E" stroke-width="2"/>
+  <text x="102" y="800" class="lab">Exists only during an invocation</text>
+  <line x1="70" y1="822" x2="92" y2="822" stroke="#8E6BE6" stroke-width="2.5"/>
+  <text x="102" y="827" class="lab">Worker connects out; no inbound ports</text>
+
+  <!-- RIGHT: Temporal Cloud -->
+  <rect x="1140" y="130" width="420" height="710" rx="14" fill="#1E1530" stroke="#8E6BE6" stroke-width="2"/>
+  <text x="1164" y="162" class="eyebrow">TEMPORAL CLOUD · YOUR NAMESPACE</text>
+
+  <rect x="1164" y="186" width="372" height="250" rx="10" fill="#2A2140" stroke="#8E6BE6" stroke-width="1.5"/>
+  <text x="1184" y="218" class="bt">Session Workflow</text>
+  <text x="1184" y="242" class="bl">Workflow Id = runtime session id</text>
+  <text x="1184" y="278" class="lab">Event History, Timers, Signals</text>
+  <text x="1184" y="314" class="ok">Survives the microVM going away;</text>
+  <text x="1184" y="336" class="ok">the next invocation with the same</text>
+  <text x="1184" y="358" class="ok">session id resumes the conversation</text>
+  <text x="1184" y="396" class="bl">Task Queues: agent-session,</text>
+  <text x="1184" y="418" class="bl">model-calls</text>
+
+  <rect x="1164" y="460" width="372" height="210" rx="10" fill="#2A2140" stroke="#8E6BE6" stroke-width="1.5"/>
+  <text x="1184" y="492" class="bt">Worker Controller Instance</text>
+  <text x="1184" y="518" class="bl">Optional (step 5). When a Task waits</text>
+  <text x="1184" y="540" class="bl">and no Worker polls, it assumes your</text>
+  <text x="1184" y="562" class="bl">invoke role and invokes the runtime.</text>
+  <text x="1184" y="598" class="bl">Set on a Worker Deployment Version</text>
+  <text x="1184" y="620" class="bl">as its compute provider</text>
+
+  <!-- Arrows -->
+  <line x1="370" y1="238" x2="438" y2="238" stroke="#B1A9C2" stroke-width="2" marker-end="url(#ah)"/>
+  <line x1="938" y1="430" x2="1162" y2="300" stroke="#8E6BE6" stroke-width="3" marker-end="url(#ahv)"/>
+  <text x="1012" y="318" class="labv">gRPC 7233,</text>
+  <text x="1012" y="338" class="labv">API key</text>
+  <path d="M1162,652 L962,652" fill="none" stroke="#E9B23A" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#aha)"/>
+  <text x="1070" y="682" class="laba" text-anchor="middle" style="font-size:13px">InvokeAgentRuntime</text>
+  <text x="1070" y="700" class="laba" text-anchor="middle" style="font-size:13px">(empty payload)</text>
+  <line x1="715" y1="640" x2="715" y2="714" stroke="#B1A9C2" stroke-width="2" marker-end="url(#ah)"/>
+  <text x="728" y="684" class="lab">invoke_model</text>
+</svg>

@@ -1,0 +1,8 @@
+{
+  "name": "deferred_follow_up",
+  "description": "Customer is not ready to decide now. The agent checks inventory, arms a durable follow-up, and later sends an outbound check-in through the channel. Drives beat 5.",
+  "triggers": ["later", "next week", "follow up", "not ready", "think about it", "call me"],
+  "fail_counts": {},
+  "follow_up": true,
+  "max_price": 20000
+}

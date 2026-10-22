@@ -1,0 +1,69 @@
+[project]
+name = "durable-agent-demo"
+version = "0.1.0"
+description = "Durable agent demo: one long-lived marketplace assistant session shown in three adoption stages"
+requires-python = ">=3.10"
+license = "MIT"
+
+# Pinned exactly. Floor is the highest of the Strands plugin's 1.28.0 and
+# Standalone Activities' 1.23.0, so 1.28.0 governs. 1.32.0 is the latest release
+# and is what is pinned. The strands-agents extra pulls the Strands SDK.
+dependencies = [
+    "temporalio[strands-agents]==1.32.0",
+    # The Strands Anthropic provider (MODEL_MODE=anthropic) needs the anthropic
+    # SDK. Bedrock ships with strands via boto3; the direct Anthropic provider
+    # does not, so it is added explicitly.
+    "anthropic>=0.40",
+    # The AWS Bedrock AgentCore SDK provides the runtime HTTP contract
+    # (BedrockAgentCoreApp: /ping and /invocations), so the Phase 2 runtime uses
+    # the supported app instead of a hand-rolled shim. FastAPI stays for the
+    # channel gateway and the dashboard.
+    "bedrock-agentcore>=1.9",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    "pyright>=1.1.390",
+]
+
+# Treat this as a non-package project: uv builds a virtualenv with the
+# dependencies but does not try to build or install the demo itself as a wheel.
+# Source lives under src/ and is imported via PYTHONPATH=src (see scripts/).
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+asyncio_mode = "auto"
+# One session-wide event loop so a single local dev server is shared across the
+# offline suite instead of restarting per test.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests/offline"]
+markers = [
+    "live: tests that require a live server, real model, or Cloud (Gate B)",
+]
+
+[tool.ruff]
+src = ["src", "tests", "scripts"]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+reportMissingImports = true
+venvPath = "."
+venv = ".venv"

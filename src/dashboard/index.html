@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Durable Agent Demo Dashboard</title>
+<style>
+  /*
+    Demo instrument, not a product UI. Watched on a shared screen while someone
+    talks, so every element is read in a single glance from a distance. Legibility
+    over density. Two accent colors only: one durable/healthy, one offline/degraded.
+    Every color is paired with a text label or badge so meaning survives a
+    washed-out projector.
+  */
+
+  :root {
+    /* Neutral scale, high contrast against a bright room. */
+    --bg: #10151c;
+    --panel: #1a222d;
+    --panel-2: #212c39;
+    --line: #34424f;
+    --ink: #f2f6fa;
+    --ink-dim: #9fb0bf;
+    --ink-fainter: #6f8090;
+
+    /* Durable / healthy accent (one color). */
+    --healthy: #2fbf71;
+    --healthy-ink: #0c2a1a;
+    --healthy-soft: #16342a;
+
+    /* Offline / degraded accent (one color). */
+    --degraded: #e0533d;
+    --degraded-ink: #2c0f09;
+    --degraded-soft: #3a1712;
+
+    /* Customer vs assistant bubbles are neutral vs accent-tinted. */
+    --bubble-customer: #2a3644;
+    --bubble-assistant: #17362a;
+    --bubble-outbound: #2e2a44;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    /* System font stack only. No external font, no CDN. */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+      Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.4;
+    padding: 14px 16px 8px;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  /* ---- Top bar: stage selector and resolved config ---- */
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .topbar h1 {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+  }
+
+  .stages {
+    display: flex;
+    gap: 8px;
+  }
+
+  .stage-btn {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--panel-2);
+    border: 2px solid var(--line);
+    border-radius: 7px;
+    padding: 8px 16px;
+    cursor: pointer;
+  }
+
+  .stage-btn:hover { border-color: var(--ink-fainter); }
+
+  .stage-btn.active {
+    background: #33507a;
+    border-color: #6ea0e6;
+    color: #ffffff;
+  }
+
+  .config {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-left: auto;
+    font-size: 14px;
+    color: var(--ink-dim);
+  }
+
+  .config .cfg-k { color: var(--ink-fainter); }
+  .config .cfg-v { color: var(--ink); font-weight: 600; }
+
+  /* ---- Stage note: one line explaining the lanes' meaning this stage ---- */
+
+  .stage-note {
+    margin: 10px 0 12px;
+    padding: 9px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 4px solid #6ea0e6;
+    border-radius: 6px;
+    font-size: 15px;
+    color: var(--ink-dim);
+  }
+
+  /* ---- Main two-column layout ---- */
+
+  .grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .col-left { min-width: 0; }
+  .col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  .panel-title {
+    font-size: 13px;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--ink-fainter);
+    padding: 10px 14px 0;
+    font-weight: 700;
+  }
+
+  /* ---- Controls ---- */
+
+  .controls {
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .send-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .send-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  select {
+    font-size: 16px;
+    color: var(--ink);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 9px 11px;
+    font-family: inherit;
+  }
+
+  input:focus, select:focus, button:focus {
+    outline: 2px solid #6ea0e6;
+    outline-offset: 1px;
+  }
+
+  button {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 9px 14px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  button:hover:not(:disabled) { border-color: var(--ink-fainter); }
+
+  button.primary {
+    background: #33507a;
+    border-color: #6ea0e6;
+    color: #ffffff;
+  }
+
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .field label {
+    font-size: 13px;
+    color: var(--ink-fainter);
+    letter-spacing: 0.3px;
+  }
+
+  .row-fields {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .row-fields .field { flex: 1; min-width: 140px; }
+
+  /* A control that does not apply to the current stage stays visible but
+     disabled, each with a one-line reason a presenter can point at. */
+  .ctl-group {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .ctl-with-reason {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .reason {
+    font-size: 13px;
+    color: var(--degraded);
+    min-height: 16px;
+  }
+  .reason.ok { color: var(--ink-fainter); }
+
+  /* ---- Transcript ---- */
+
+  #transcript {
+    padding: 8px 14px 14px;
+    height: calc(100vh - 340px);
+    min-height: 340px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .empty-note {
+    color: var(--ink-dim);
+    font-size: 16px;
+    padding: 18px 6px;
+    font-style: normal;
+  }
+
+  .lost-note {
+    color: var(--degraded);
+    font-size: 17px;
+    font-weight: 600;
+    padding: 18px 6px;
+  }
+
+  .entry { max-width: 82%; }
+
+  .entry-label {
+    font-size: 13px;
+    color: var(--ink-fainter);
+    margin-bottom: 2px;
+    letter-spacing: 0.3px;
+  }
+
+  .bubble {
+    padding: 9px 13px;
+    border-radius: 10px;
+    font-size: 16px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* customer: right-ish aligned, neutral bubble. */
+  .entry.customer_message {
+    align-self: flex-end;
+    text-align: right;
+  }
+  .entry.customer_message .bubble {
+    background: var(--bubble-customer);
+    border: 1px solid var(--line);
+  }
+
+  /* agent reply: left-ish, accent (durable/healthy) bubble. */
+  .entry.agent_reply { align-self: flex-start; }
+  .entry.agent_reply .bubble {
+    background: var(--bubble-assistant);
+    border: 1px solid #2f6b52;
+  }
+
+  /* outbound: distinct from agent reply, left through the gateway. */
+  .entry.outbound { align-self: flex-start; }
+  .entry.outbound .bubble {
+    background: var(--bubble-outbound);
+    border: 1px solid #574c86;
+  }
+  .entry.outbound .entry-label { color: #a99ce0; }
+
+  /* tool call/result and system: monospace, label plus outcome one line. */
+  .entry.tool_call,
+  .entry.tool_result,
+  .entry.system {
+    align-self: stretch;
+    max-width: 100%;
+  }
+
+  .tool-line, .system-line {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    font-size: 15px;
+  }
+
+  .tool-kind {
+    color: var(--ink-fainter);
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    min-width: 74px;
+  }
+  .tool-name { color: var(--ink); font-weight: 600; }
+
+  /* Outcome is colored AND carries its own text label, never color alone. */
+  .outcome { font-weight: 700; margin-left: auto; }
+  .outcome.ok { color: var(--healthy); }
+  .outcome.failed { color: var(--degraded); }
+  .outcome.pending { color: var(--ink-dim); }
+
+  .system-line .sys-text { color: var(--ink); }
+  .system-line .sys-tag {
+    color: var(--ink-fainter);
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    min-width: 74px;
+  }
+
+  .tool-detail { color: var(--ink-fainter); font-size: 13px; }
+
+  /* The only motion in the whole page: a brief highlight (<=150ms) when a new
+     transcript entry lands, to draw the eye to what just changed. */
+  @keyframes flash {
+    from { background-color: #48607e; }
+    to { background-color: transparent; }
+  }
+  .entry.new-entry .bubble,
+  .entry.new-entry .tool-line,
+  .entry.new-entry .system-line {
+    animation: flash 150ms ease-out;
+  }
+
+  /* ---- Lanes (right column) ---- */
+
+  .lane {
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    padding: 14px;
+    background: var(--panel);
+  }
+
+  .lane-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .lane-head .lane-name {
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+  }
+  .lane-head .lane-sub {
+    font-size: 13px;
+    color: var(--ink-fainter);
+    letter-spacing: 0.4px;
+  }
+
+  .badge {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    padding: 3px 9px;
+    border-radius: 5px;
+    text-transform: uppercase;
+  }
+  .badge.offline {
+    background: var(--degraded);
+    color: var(--degraded-ink);
+  }
+
+  .lane-big {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin: 4px 0 6px;
+  }
+
+  .lane-detail {
+    font-size: 15px;
+    color: var(--ink-dim);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .lane-detail .kv .k { color: var(--ink-fainter); }
+  .lane-detail .kv .v { color: var(--ink); font-weight: 600; }
+
+  /* PLATFORM lane: durable server state. Steady green. This lane must not change
+     appearance at all when the Worker goes offline. That steadiness is the point. */
+  .lane.platform-durable {
+    background: var(--healthy-soft);
+    border-color: var(--healthy);
+  }
+  .lane.platform-durable .lane-big { color: var(--healthy); }
+
+  /* WORKER lane, online: healthy fill, clearly the same family as platform but
+     labeled WORKER. */
+  .lane.worker-online {
+    background: var(--healthy-soft);
+    border-color: var(--healthy);
+  }
+  .lane.worker-online .lane-big { color: var(--healthy); }
+
+  /* WORKER lane, offline: different FILL COLOR (degraded accent), an OFFLINE
+     badge in the header, reduced-contrast detail area, and the last successful
+     query time. The PLATFORM lane is untouched. */
+  .lane.worker-offline {
+    background: var(--degraded-soft);
+    border-color: var(--degraded);
+  }
+  .lane.worker-offline .lane-big { color: var(--degraded); }
+  .lane.worker-offline .lane-detail {
+    /* pipeline/detail drops to clearly reduced contrast (dimmed). */
+    opacity: 0.42;
+  }
+
+  /* Dead lanes for stage 0 (and platform meaning for stages 0/1). Greyed tiles. */
+  .lane.dead {
+    background: #171d24;
+    border-color: #2a333d;
+    border-style: dashed;
+  }
+  .lane.dead .lane-big { color: var(--ink-fainter); font-size: 22px; }
+  .lane.dead .lane-name { color: var(--ink-fainter); }
+
+  /* Neutral "na" state: harness is not a Worker. Not the offline-red state. */
+  .lane.na {
+    background: var(--panel);
+    border-color: var(--line);
+  }
+  .lane.na .lane-big { color: var(--ink-dim); font-size: 20px; }
+
+  .lane-caption {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--ink-fainter);
+    line-height: 1.35;
+  }
+
+  /* ---- Footer ---- */
+
+  footer {
+    margin: 12px 2px 4px;
+    font-size: 13px;
+    color: var(--ink-fainter);
+  }
+
+  .status-line {
+    font-size: 13px;
+    color: var(--ink-fainter);
+    margin-left: 4px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Top bar: stage selector above both columns, plus resolved config compactly. -->
+  <div class="topbar">
+    <h1>Durable Agent Demo</h1>
+    <div class="stages" id="stages">
+      <button class="stage-btn" data-stage="0">Stage 0</button>
+      <button class="stage-btn" data-stage="1">Stage 1</button>
+      <button class="stage-btn active" data-stage="2">Stage 2</button>
+    </div>
+    <div class="config" id="config">
+      <span class="cfg-k">config loading...</span>
+    </div>
+  </div>
+
+  <!-- One line explaining what the lanes mean in the selected stage. -->
+  <div class="stage-note" id="stageNote"></div>
+
+  <div class="grid">
+    <!-- LEFT ~2/3: the conversation transcript gets the space. -->
+    <div class="col-left">
+      <div class="panel">
+        <div class="panel-title">Controls</div>
+        <div class="controls">
+          <div class="send-row">
+            <input type="text" id="msgText" placeholder="Type a customer message..."
+              value="I want to check financing on the blue sedan.">
+            <button class="primary" id="sendBtn">Send as customer</button>
+          </div>
+          <div class="row-fields">
+            <div class="field">
+              <label for="conv">conversation id</label>
+              <input type="text" id="conv" value="demo">
+            </div>
+            <div class="field">
+              <label for="scenario">scenario</label>
+              <select id="scenario">
+                <option value="happy">happy</option>
+                <option value="deferred_follow_up">deferred_follow_up</option>
+                <option value="handoff" selected>handoff</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="failCount">skill failure count (blank = scenario default)</label>
+              <input type="number" id="failCount" min="0" max="3" value="" placeholder="scenario">
+            </div>
+          </div>
+          <div class="ctl-group" id="stage2Controls">
+            <div class="ctl-with-reason">
+              <button id="repliesNowBtn" data-action="customer_replies_now">Customer replies now</button>
+              <span class="reason" id="reason-repliesNow"></span>
+            </div>
+            <div class="ctl-with-reason">
+              <button id="fastFwdBtn" data-action="fast_forward_follow_up">Fast-forward the wake-up</button>
+              <span class="reason" id="reason-fastFwd"></span>
+            </div>
+            <div class="ctl-with-reason">
+              <button id="handoffBtn" data-action="respond_handoff">Approve / escalate</button>
+              <span class="reason" id="reason-handoff"></span>
+            </div>
+            <div class="ctl-with-reason">
+              <button id="canBtn" data-action="force_continue_as_new">Force continue-as-new</button>
+              <span class="reason" id="reason-can"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-title">Conversation transcript
+          <span class="status-line" id="pollStatus"></span>
+        </div>
+        <div id="transcript">
+          <div class="empty-note">Waiting for the first state read.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT ~1/3: two lanes stacked. PLATFORM on top, WORKER on bottom. -->
+    <div class="col-right">
+      <div id="platformLane"></div>
+      <div id="workerLane"></div>
+    </div>
+  </div>
+
+  <footer>
+    Query polling is fine for a demo and would be a projected read model in production.
+  </footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Element handles ----
+  var $ = function (id) { return document.getElementById(id); };
+  var transcriptEl = $("transcript");
+  var platformLaneEl = $("platformLane");
+  var workerLaneEl = $("workerLane");
+  var stageNoteEl = $("stageNote");
+  var configEl = $("config");
+  var pollStatusEl = $("pollStatus");
+
+  // ---- Local view state. All workflow state is derived on the server; the page
+  //      only renders what /api/state returns. We keep just enough here to route
+  //      requests and to detect brand-new transcript entries for the highlight. ----
+  var currentStage = "2";
+  var seenSeqs = {};            // seq values already rendered (for new-entry flash)
+  var haveRendered = false;     // becomes true after the first successful render
+
+  // Stage-aware note: one line the presenter can read for what the lanes mean.
+  var STAGE_NOTES = {
+    "0": "Stage 0: the process is the state. Kill it and everything is gone. " +
+         "Both lanes are dead on purpose. That absence is the point of this stage.",
+    "1": "Stage 1: a Standalone Activity holds durable state, so it survives the " +
+         "harness dying. There is still no Worker lane to watch, because the harness is not a Worker.",
+    "2": "Stage 2: the PLATFORM lane is durable server state and stays steady even " +
+         "when the Worker dies. Kill the Worker and watch the WORKER lane diverge while PLATFORM holds."
+  };
+
+  // ---- Config (loaded once) ----
+  var WORKER_MODE = "local";  // "agentcore" switches the WORKER lane to drain framing
+  function loadConfig() {
+    fetch("/api/config").then(function (r) { return r.json(); }).then(function (c) {
+      WORKER_MODE = c.worker_mode || "local";
+      configEl.innerHTML =
+        cfgItem("model", c.model_mode) +
+        cfgItem("skills", c.skills_mode) +
+        cfgItem("temporal", c.temporal_target) +
+        cfgItem("worker", WORKER_MODE) +
+        cfgItem("MODEL_QUEUE_RPS", c.model_queue_rps) +
+        cfgItem("follow_up_s", c.follow_up_seconds);
+    }).catch(function () {
+      configEl.innerHTML = "<span class='cfg-k'>config unavailable</span>";
+    });
+  }
+
+  function cfgItem(k, v) {
+    return "<span><span class='cfg-k'>" + esc(k) + "</span> " +
+      "<span class='cfg-v'>" + esc(String(v)) + "</span></span>";
+  }
+
+  // ---- Stage selection ----
+  function selectStage(stage) {
+    currentStage = stage;
+    var btns = document.querySelectorAll(".stage-btn");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle("active", btns[i].getAttribute("data-stage") === stage);
+    }
+    stageNoteEl.textContent = STAGE_NOTES[stage] || "";
+    // Reset transcript view for the new stage so entries flash fresh.
+    seenSeqs = {};
+    haveRendered = false;
+    transcriptEl.innerHTML = "<div class='empty-note'>Loading stage " + esc(stage) + "...</div>";
+    updateControlAvailability();
+    poll();
+  }
+
+  // Controls that do not apply to the selected stage stay visible but disabled,
+  // each with a one-line reason. Stage 2 controls only work in stage 2.
+  function updateControlAvailability() {
+    var stage2Only = (currentStage === "2");
+    var reason = stage2Only ? "" : "needs stage 2";
+    var reasonClass = stage2Only ? "reason ok" : "reason";
+
+    setControl("repliesNowBtn", "reason-repliesNow", stage2Only, reason, reasonClass,
+      "uses the running Workflow signal");
+    setControl("fastFwdBtn", "reason-fastFwd", stage2Only, reason, reasonClass,
+      "skips the Timer inside the Workflow");
+    setControl("handoffBtn", "reason-handoff", stage2Only, reason, reasonClass,
+      "answers an open handoff via signal");
+    setControl("canBtn", "reason-can", stage2Only, reason, reasonClass,
+      "forces continue-as-new on the Workflow");
+  }
+
+  function setControl(btnId, reasonId, enabled, reason, reasonClass, okReason) {
+    $(btnId).disabled = !enabled;
+    var el = $(reasonId);
+    el.className = reasonClass;
+    el.textContent = enabled ? okReason : reason;
+  }
+
+  // ---- Polling: GET /api/state every ~1000ms for the current stage + conversation ----
+  var pollTimer = null;
+  function scheduleNextPoll() {
+    if (pollTimer) { clearTimeout(pollTimer); }
+    pollTimer = setTimeout(poll, 1000);
+  }
+
+  function poll() {
+    var conv = encodeURIComponent($("conv").value || "demo");
+    var stageAtRequest = currentStage;
+    fetch("/api/state?stage=" + encodeURIComponent(stageAtRequest) + "&conversation=" + conv)
+      .then(function (r) { return r.json(); })
+      .then(function (state) {
+        // Ignore a late response if the presenter switched stages meanwhile.
+        if (stageAtRequest !== currentStage) { return; }
+        render(state);
+        pollStatusEl.textContent = "live";
+      })
+      .catch(function () {
+        pollStatusEl.textContent = "state read failed (retrying)";
+      })
+      .then(scheduleNextPoll);
+  }
+
+  // ---- Render everything the API returned. No client-side state derivation. ----
+  function render(state) {
+    renderTranscript(state);
+    if (state.stage === "2") {
+      renderLanesStage2(state);
+    } else {
+      renderLanesDead(state);
+    }
+  }
+
+  function renderTranscript(state) {
+    // Stage 0/1 harness died: its feed stops answering. Say so in words, do not
+    // leave stale content on screen.
+    if (state.feed_alive === false) {
+      transcriptEl.innerHTML =
+        "<div class='lost-note'>transcript lost (process died)</div>";
+      seenSeqs = {};
+      haveRendered = false;
+      return;
+    }
+
+    var events = (state.transcript || []).slice();
+    events.sort(function (a, b) { return (a.seq || 0) - (b.seq || 0); });
+
+    if (events.length === 0) {
+      transcriptEl.innerHTML =
+        "<div class='empty-note'>No messages yet. Send one as the customer to begin.</div>";
+      return;
+    }
+
+    // Rebuild the list. New seqs (not seen before) get the brief highlight, but
+    // only after we have rendered at least once, so the initial load is quiet.
+    transcriptEl.innerHTML = "";
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      var isNew = haveRendered && ev.seq != null && !seenSeqs[ev.seq];
+      transcriptEl.appendChild(renderEntry(ev, isNew));
+      if (ev.seq != null) { seenSeqs[ev.seq] = true; }
+    }
+    haveRendered = true;
+
+    // Auto-scroll to newest.
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  }
+
+  function renderEntry(ev, isNew) {
+    var wrap = document.createElement("div");
+    wrap.className = "entry " + esc(ev.kind || "system");
+    if (isNew) { wrap.className += " new-entry"; }
+
+    if (ev.kind === "customer_message") {
+      wrap.appendChild(labelEl("customer"));
+      wrap.appendChild(bubbleEl(ev.text));
+    } else if (ev.kind === "agent_reply") {
+      wrap.appendChild(labelEl("assistant"));
+      wrap.appendChild(bubbleEl(ev.text));
+    } else if (ev.kind === "outbound") {
+      // Distinct from agent_reply: shows beat 5's message left via the gateway.
+      wrap.appendChild(labelEl("outbound (via channel)"));
+      wrap.appendChild(bubbleEl(ev.text));
+    } else if (ev.kind === "tool_call" || ev.kind === "tool_result") {
+      wrap.appendChild(toolLineEl(ev));
+    } else {
+      // system and any unknown kind: monospace, neutral.
+      wrap.appendChild(systemLineEl(ev));
+    }
+    return wrap;
+  }
+
+  function labelEl(text) {
+    var d = document.createElement("div");
+    d.className = "entry-label";
+    d.textContent = text;
+    return d;
+  }
+
+  function bubbleEl(text) {
+    var d = document.createElement("div");
+    d.className = "bubble";
+    d.textContent = text == null ? "" : text;
+    return d;
+  }
+
+  // Tool call/result: monospace tool name plus its outcome on the same line.
+  // The outcome is colored AND keeps its text label (never color alone).
+  function toolLineEl(ev) {
+    var line = document.createElement("div");
+    line.className = "tool-line mono";
+
+    var kind = document.createElement("span");
+    kind.className = "tool-kind";
+    kind.textContent = ev.kind === "tool_call" ? "tool call" : "tool result";
+    line.appendChild(kind);
+
+    var name = document.createElement("span");
+    name.className = "tool-name";
+    name.textContent = ev.tool || ev.text || "tool";
+    line.appendChild(name);
+
+    // detail is an object (often empty) on stage 2 events; only a string is shown.
+    if (typeof ev.detail === "string" && ev.detail) {
+      var det = document.createElement("span");
+      det.className = "tool-detail";
+      det.textContent = ev.detail;
+      line.appendChild(det);
+    }
+
+    var status = ev.status || "pending";
+    var out = document.createElement("span");
+    out.className = "outcome " + esc(status);
+    out.textContent = status;   // text label always present
+    line.appendChild(out);
+
+    return line;
+  }
+
+  // System event: monospace, neutral. Examples: "follow-up armed",
+  // "handed off to back office", "back office responded: approved by back office".
+  function systemLineEl(ev) {
+    var line = document.createElement("div");
+    line.className = "system-line mono";
+
+    var tag = document.createElement("span");
+    tag.className = "sys-tag";
+    tag.textContent = "system";
+    line.appendChild(tag);
+
+    var text = document.createElement("span");
+    text.className = "sys-text";
+    text.textContent = ev.text || ev.detail || "event";
+    line.appendChild(text);
+
+    return line;
+  }
+
+  // ---- Lanes for stage 2: PLATFORM steady, WORKER diverges on death ----
+  function renderLanesStage2(state) {
+    var platform = state.platform || {};
+    var worker = state.worker || {};
+
+    // PLATFORM lane. Reads platform.status from describe. Big steady status.
+    // MUST NOT change appearance when the Worker goes offline.
+    var pStatus = platform.exists ? (platform.status || "RUNNING") : "NOT STARTED";
+    platformLaneEl.className = "lane platform-durable";
+    platformLaneEl.innerHTML =
+      laneHead("PLATFORM", "durable server state", null) +
+      "<div class='lane-big'>" + esc(pStatus) + "</div>" +
+      "<div class='lane-detail'>" +
+        kv("answered by", "the server (describe)") +
+        kv("survives", "Worker death") +
+      "</div>";
+
+    // WORKER lane. Reads worker.online (a Workflow query). The query is the crisp
+    // drain signal: it flips within about 2s when the Worker is gone. The poller
+    // identity (DescribeTaskQueue) is used only as a location badge, not the flip,
+    // because poller visibility lags by up to a minute after a drain.
+    var ac = (WORKER_MODE === "agentcore");
+    var ids = worker.identities || [];
+    var loc = ids.length ? ids.join(", ") : "unknown";
+    if (worker.online) {
+      var st = worker.status || {};
+      workerLaneEl.className = "lane worker-online";
+      workerLaneEl.innerHTML =
+        laneHead("WORKER", ac ? "serverless worker in AgentCore" : "answers Workflow queries", null) +
+        "<div class='lane-big'>" + (ac ? "WARM" : "ONLINE") + "</div>" +
+        "<div class='lane-detail'>" +
+          (ac ? kv("running in", loc) : "") +
+          kv("processed", show(st.processed)) +
+          kv("pending", show(st.pending)) +
+          kv("follow_up_armed", show(st.follow_up_armed)) +
+          kv("last query", show(worker.last_query_at)) +
+        "</div>";
+    } else {
+      // All five divergence signals at once. PLATFORM lane above is untouched.
+      workerLaneEl.className = "lane worker-offline";
+      workerLaneEl.innerHTML =
+        laneHead("WORKER", ac ? "no worker polling" : "query is not being answered",
+                 "<span class='badge offline'>" + (ac ? "drained" : "offline") + "</span>") +
+        "<div class='lane-big'>" + (ac ? "DRAINED" : "OFFLINE") + "</div>" +
+        "<div class='lane-detail'>" +
+          kv("state", ac ? "compute reaped, no worker polling" : "query failed, Worker is down") +
+          kv("last successful query", show(worker.last_query_at)) +
+        "</div>" +
+        "<div class='lane-caption'>" + (ac
+          ? "AgentCore reaped the idle compute. The PLATFORM lane above did not change: " +
+            "the session lives in Temporal, so the next message boots a fresh worker and resumes it."
+          : "The PLATFORM lane above did not change. That steady lane beside this collapsed one is the whole point.") +
+        "</div>";
+    }
+  }
+
+  // ---- Lanes for stage 0 and 1: dead / na tiles ----
+  function renderLanesDead(state) {
+    var platform = state.platform || {};
+    var worker = state.worker || {};
+
+    if (state.stage === "1") {
+      // Stage 1 PLATFORM: a Standalone Activity survives the harness dying.
+      platformLaneEl.className = "lane na";
+      platformLaneEl.innerHTML =
+        laneHead("PLATFORM", "Standalone Activity state", null) +
+        "<div class='lane-big'>ACTIVITY HOLDS STATE</div>" +
+        "<div class='lane-detail'>" +
+          kv("durable", "survives the harness dying") +
+        "</div>" +
+        "<div class='lane-caption'>An Activity keeps the state alive, but there is " +
+        "still no Worker lane to watch here.</div>";
+
+      // Stage 1 WORKER: harness is not a Worker. Neutral, not the offline-red state.
+      workerLaneEl.className = "lane na";
+      workerLaneEl.innerHTML =
+        laneHead("WORKER", worker.label || "harness is not a worker", null) +
+        "<div class='lane-big'>NOT A WORKER</div>" +
+        "<div class='lane-detail'>" +
+          kv("meaning", "there is no Worker to poll here") +
+        "</div>";
+      return;
+    }
+
+    // Stage 0: both lanes are greyed dead tiles, and that is the point.
+    platformLaneEl.className = "lane dead";
+    platformLaneEl.innerHTML =
+      laneHead("PLATFORM", platform.label || "no durable state", null) +
+      "<div class='lane-big'>NO DURABLE STATE</div>" +
+      "<div class='lane-caption'>These dead lanes are the point of stage 0, not a " +
+      "limitation. There is nothing durable to observe yet.</div>";
+
+    workerLaneEl.className = "lane dead";
+    workerLaneEl.innerHTML =
+      laneHead("WORKER", worker.label || "process is the state", null) +
+      "<div class='lane-big'>PROCESS IS THE STATE</div>" +
+      "<div class='lane-caption'>Kill the process and the state is gone. " +
+      "There is no Worker and no server-side record to fall back on.</div>";
+  }
+
+  // ---- Lane helpers ----
+  function laneHead(name, sub, badgeHtml) {
+    return "<div class='lane-head'>" +
+      "<span class='lane-name'>" + esc(name) + "</span>" +
+      (badgeHtml || "") +
+      "<span class='lane-sub'>" + esc(sub) + "</span>" +
+      "</div>";
+  }
+
+  function kv(k, v) {
+    return "<div class='kv'><span class='k'>" + esc(k) + ":</span> " +
+      "<span class='v'>" + esc(v) + "</span></div>";
+  }
+
+  function show(v) {
+    return (v === null || v === undefined || v === "") ? "not reported" : String(v);
+  }
+
+  // ---- Actions ----
+  function sendMessage() {
+    var body = {
+      stage: currentStage,
+      conversation: $("conv").value || "demo",
+      text: $("msgText").value || "",
+      scenario: $("scenario").value,
+      // Blank sends null, so the scenario's own failure count applies (handoff fails 3 times).
+      fail_count: $("failCount").value === "" ? null : parseInt($("failCount").value, 10)
+    };
+    postJson("/api/send", body);
+  }
+
+  function sendControl(action) {
+    var body = { conversation: $("conv").value || "demo", action: action };
+    if (action === "customer_replies_now") {
+      body.text = $("msgText").value || "I'm ready now";
+    }
+    if (action === "respond_handoff") {
+      body.decision = "approved";
+      body.approver = "back office";
+    }
+    postJson("/api/control", body);
+  }
+
+  function postJson(url, body) {
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function () {
+      // Just refresh; the server holds the truth.
+      poll();
+    }).catch(function () {
+      pollStatusEl.textContent = "action failed";
+    });
+  }
+
+  // ---- Small helpers ----
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // ---- Wire up events ----
+  var stageBtns = document.querySelectorAll(".stage-btn");
+  for (var i = 0; i < stageBtns.length; i++) {
+    stageBtns[i].addEventListener("click", function () {
+      selectStage(this.getAttribute("data-stage"));
+    });
+  }
+
+  $("sendBtn").addEventListener("click", sendMessage);
+  $("msgText").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { sendMessage(); }
+  });
+
+  var ctlBtns = document.querySelectorAll("#stage2Controls button");
+  for (var j = 0; j < ctlBtns.length; j++) {
+    ctlBtns[j].addEventListener("click", function () {
+      if (this.disabled) { return; }
+      sendControl(this.getAttribute("data-action"));
+    });
+  }
+
+  // Changing the conversation id retargets polling immediately.
+  $("conv").addEventListener("change", function () {
+    seenSeqs = {};
+    haveRendered = false;
+    poll();
+  });
+
+  // ---- Boot ----
+  // ?conversation=<id> preselects the conversation, so a beat's printed id opens directly.
+  var urlConv = new URLSearchParams(window.location.search).get("conversation");
+  if (urlConv) { $("conv").value = urlConv; }
+  loadConfig();
+  selectStage("2");
+})();
+</script>
+</body>
+</html>

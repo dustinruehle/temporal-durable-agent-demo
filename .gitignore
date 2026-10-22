@@ -1,0 +1,45 @@
+# Optional term list for scripts/check_generic.sh. You supply it locally; it is
+# never committed.
+.check-generic-terms
+
+# Rendered IAM policies (deploy/agentcore/bin/render-iam.sh writes them here).
+deploy/agentcore/out/
+
+# Local environment and secrets
+.env
+*.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.uv/
+build/
+dist/
+
+# Test and tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.coverage
+htmlcov/
+
+# Temporal dev server state
+*.db
+*.db-shm
+*.db-wal
+/tmp-temporal/
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
+
+# Local runtime scratch
+*.log
+/run/

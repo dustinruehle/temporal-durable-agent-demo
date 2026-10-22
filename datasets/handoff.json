@@ -1,0 +1,8 @@
+{
+  "name": "handoff",
+  "description": "Customer asks about financing. The financing check fails and exhausts its retries, so the model tries a lower-priced vehicle through inventory as a different approach. That does not resolve the need either, so the model hands off to the back office and the session parks on a signal. Drives beat 6.",
+  "triggers": ["financing", "finance", "loan", "afford", "credit", "payment plan"],
+  "fail_counts": {"check_financing_status": 3},
+  "follow_up": false,
+  "max_price": 10000
+}
