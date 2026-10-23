@@ -1,27 +1,41 @@
 # Temporal durable agent demo
 
-An AI agent session that survives Worker crashes, waits for hours or days with no Worker running, and parks on a human approval, with no rehydration code.
-The agent loop is an open source [Strands](https://strandsagents.com) agent. [Temporal](https://docs.temporal.io/temporal) wraps it: the session is a Workflow, and every model call and tool call is an Activity.
-It runs on your laptop in mock mode with no keys, or against Amazon Bedrock and Temporal Cloud.
-To bring your own agent loop, go to [Plug in your own agent loop](#plug-in-your-own-agent-loop).
+An AI agent session that survives Worker crashes, waits hours or days with no Worker running, and parks on a human approval, with no rehydration code to write.
+
+The agent loop is an open source [Strands](https://strandsagents.com) agent. [Temporal](https://docs.temporal.io/temporal) wraps it: the session is a Workflow, and every model call and tool call is an Activity. You can run it on your laptop with no keys, against Amazon Bedrock and Temporal Cloud, or with the Worker on Amazon Bedrock AgentCore Runtime, where Temporal starts the Worker only when there is work.
 
 ![What runs where](docs/what-runs-where.svg)
+
+## Pick your path
+
+| Path | You need | Time | You watch it in |
+|---|---|---|---|
+| **1. Laptop, mock mode** | [uv](https://docs.astral.sh/uv/), the [Temporal CLI](https://docs.temporal.io/cli), `git`. No keys. | 5 minutes | The demo dashboard and the local Temporal UI |
+| **2. Live: Amazon Bedrock and Temporal Cloud** | Path 1, plus a Temporal Cloud Namespace and API key, and AWS credentials with Bedrock model access | 15 minutes | The dashboard and the Temporal Cloud UI |
+| **3. Serverless on Amazon Bedrock AgentCore** | Path 2, plus Docker with `buildx`, rights to create an ECR repo, IAM roles and an AgentCore runtime, and Temporal Cloud access to the Pre-release | 45 minutes | The Temporal Cloud UI and the AWS console (AgentCore, CloudWatch) |
+
+Start with path 1. Each path adds to the one before it, and the same code runs in all three.
+
+> [!NOTE]
+> To bring your own agent loop instead of Strands, go to [Plug in your own agent loop](#plug-in-your-own-agent-loop).
 
 ## Contents
 
 1. [What you will see](#what-you-will-see)
 2. [How it works](#how-it-works)
-3. [Quickstart: mock mode, no keys](#quickstart-mock-mode-no-keys)
-4. [Live mode: Amazon Bedrock and Temporal Cloud](#live-mode-amazon-bedrock-and-temporal-cloud)
+3. [Path 1: Quickstart, mock mode, no keys](#quickstart-mock-mode-no-keys)
+4. [Path 2: Live mode, Amazon Bedrock and Temporal Cloud](#live-mode-amazon-bedrock-and-temporal-cloud)
 5. [Run the beats](#run-the-beats)
-6. [Where Temporal plugs in](#where-temporal-plugs-in)
-7. [Plug in your own agent loop](#plug-in-your-own-agent-loop)
-8. [Run the Worker serverless](#run-the-worker-serverless)
-9. [Patterns used](#patterns-used)
-10. [Release stages](#release-stages)
-11. [Configuration](#configuration)
-12. [Troubleshooting](#troubleshooting)
-13. [Repo map](#repo-map)
+6. [Watch it in the Temporal UI](#watch-it-in-the-temporal-ui)
+7. [Path 3: Run the Worker on Amazon Bedrock AgentCore](#path-3-run-the-worker-on-amazon-bedrock-agentcore)
+8. [Where Temporal plugs in](#where-temporal-plugs-in)
+9. [Plug in your own agent loop](#plug-in-your-own-agent-loop)
+10. [Patterns used](#patterns-used)
+11. [Release stages](#release-stages)
+12. [Configuration](#configuration)
+13. [Troubleshooting](#troubleshooting)
+14. [Further reading](#further-reading)
+15. [Repo map](#repo-map)
 
 ## What you will see
 
@@ -66,6 +80,8 @@ The dashboard shows two lanes. PLATFORM reads the Workflow from the Temporal Ser
 The five beats use stage 2, with stage 0 as the contrast in beat 2.
 
 ## Quickstart: mock mode, no keys
+
+*Path 1.*
 
 Mock mode uses a mock model, mock tools and a local Temporal dev server. Everything except token generation is real: Event History, Timers, Signals, Retry Policies, replay and Worker recovery.
 
@@ -118,6 +134,8 @@ export OUTBOUND_URL="http://127.0.0.1:8090/outbound"
 The gateway builds each session's input, so `FOLLOW_UP_DELAY` on the gateway sets when a follow-up fires (here, 30 seconds). For live mode, load `.env` in every terminal first: `set -a; . ./.env; set +a`.
 
 ## Live mode: Amazon Bedrock and Temporal Cloud
+
+*Path 2.*
 
 Only the model and the Temporal connection change. The Worker, gateway and dashboard still run on your machine. Every setting lives in `.env`; copy [`.env.example`](.env.example) to start.
 
@@ -272,6 +290,89 @@ Headless: `uv run python scripts/beat.py 6` (it nudges and approves on its own).
 | `7` | A Task Queue-wide model rate cap holds across two Workers. Start the stack with `MODEL_QUEUE_RPS=2 ./scripts/run.sh --workers 2`, then in another terminal run `MODEL_QUEUE_RPS=2 uv run python scripts/beat.py 7`. Set it in both places, so the Workers apply the cap and `beat.py` checks against it |
 | `8` | Continue-As-New carries the conversation and the follow-up deadline into a fresh run |
 
+## Watch it in the Temporal UI
+
+Open the Temporal UI next to the dashboard: <http://localhost:8233> in path 1, the [Temporal Cloud UI](https://cloud.temporal.io) in paths 2 and 3. The screenshots below come from the local dev server; the Temporal Cloud UI shows the same pages.
+
+| Beat | Open | What to look at |
+|---|---|---|
+| 1 | **Workflows**, then the session (Workflow Id = conversation id) | Type `SessionWorkflow`, status Running. **Event History** lists each `invoke_model` and tool Activity in order. |
+| 2 | The same session, after you kill and restart the Worker | The Run Id does not change. The next Workflow Task shows the new Worker's identity. |
+| 3 | **Workflows**, filter `NextFollowUpAt IS NOT NULL AND ExecutionStatus = "Running"` | One row per session with a planned wake-up. Open one, then **Search Attributes**: `NextFollowUpAt` holds the deadline. |
+| 4 | The follow-up session, **Event History**, **Compact** | A Timer row, then `send_customer_message` run by the Worker that came back. |
+| 5 | The handoff session, **Event History**, **Compact** | `check_financing_status` with Attempt 3 and its failure, then the `respond_handoff` Signal with the decision. |
+| More | **Standalone Activities** | `stage1-financing-check`, Completed: one call made durable with no Workflow (`beat.py 2`). |
+
+<details>
+<summary><b>Screenshots: the planned follow-ups across sessions (beat 3)</b></summary>
+
+![The Workflows list filtered on NextFollowUpAt](docs/ui-planned-follow-ups.png)
+
+![The NextFollowUpAt Search Attribute on one session](docs/ui-next-follow-up-at.png)
+</details>
+
+<details>
+<summary><b>Screenshots: the retries and the approval in Event History (beat 5)</b></summary>
+
+![Compact Event History: the financing Activity on attempt 3, then the respond_handoff Signal](docs/ui-retries-compact.png)
+
+The list is newest first. Retries are recorded on one Activity row, not one row per attempt.
+</details>
+
+<details>
+<summary><b>Screenshots: the follow-up Timer (beat 4) and the Standalone Activity</b></summary>
+
+![Compact Event History: the Timer, the fast_forward_follow_up Signal and send_customer_message](docs/ui-timer-and-follow-up.png)
+
+![The Standalone Activities page](docs/ui-standalone-activity.png)
+</details>
+
+## Path 3: Run the Worker on Amazon Bedrock AgentCore
+
+> [!IMPORTANT]
+> [Serverless Workers on Amazon Bedrock AgentCore Runtime](https://docs.temporal.io/serverless-workers/agentcore) are in **Pre-release**: the APIs can change. On Temporal Cloud, request access through a support ticket or your account team.
+
+The Worker holds no state, so it can run on compute that starts and stops. In this path the same session Workflow runs inside AgentCore Runtime, and no Worker runs between turns:
+
+- **Each invocation starts a short-lived Worker** in the AgentCore microVM. It runs the work on the Task Queues, waits until nothing has run for an idle window (`AGENTCORE_DEBOUNCE_SECONDS`, 60 seconds by default; the steps set 15), then drains and returns.
+- **The session lives in Temporal Cloud.** AgentCore can end the microVM at any time; the next invocation picks the session up from Event History.
+- **Temporal can start the Worker for you.** With a compute provider on a Worker Deployment Version, Temporal's Worker Controller Instance calls `InvokeAgentRuntime` when a Task waits and no Worker polls. A durable follow-up that fires days later starts a Worker the same way.
+
+![AgentCore deployment: what runs where](docs/agentcore-what-runs-where.svg)
+
+![How Temporal starts a Worker in AgentCore](docs/serverless-invocation.svg)
+
+### Steps
+
+The full commands are in [`deploy/agentcore/README.md`](deploy/agentcore/README.md). In order:
+
+| Step | What you do | What it proves |
+|---|---|---|
+| 1. [Execution role](deploy/agentcore/README.md#step-1-create-the-execution-role) | Render the IAM templates for your account and create the role AgentCore runs the container as | |
+| 2. [Build and push](deploy/agentcore/README.md#step-2-build-and-push-the-image) | `./deploy/agentcore/deploy.sh` builds the ARM64 image and pushes it to ECR | |
+| 3. [Create the runtime](deploy/agentcore/README.md#step-3-create-the-runtime) | `create_runtime.py` creates the runtime with your Temporal Cloud connection | |
+| 4. [Invoke it](deploy/agentcore/README.md#step-4-invoke-it-with-no-local-worker) | Send a turn, end the microVM with `stop-runtime-session`, send a second turn | The session survives the microVM: turn 2 remembers turn 1 |
+| 5. [Let Temporal start the Worker](deploy/agentcore/README.md#step-5-optional-let-temporal-start-the-worker) | Create the invoke role, version the runtime, `serverless.sh wire`, run `verify_serverless.py` | No Worker runs until there is work |
+| 6. [A follow-up across scale to zero](deploy/agentcore/README.md#step-6-optional-a-follow-up-across-scale-to-zero) | `verify_serverless.py --follow-up 90` | A Timer fires with no Worker running, and Temporal starts one |
+| 7. [Watch it](deploy/agentcore/README.md#step-7-watch-it-in-the-aws-console-and-the-temporal-ui) | The AgentCore runtime page, CloudWatch Live Tail, the Temporal Cloud UI | Where each step shows up |
+| 8. [Clean up](deploy/agentcore/README.md#step-8-clean-up) | Unwire, then delete the runtime, the image, the roles and the stack | |
+
+### What you see in the AWS console and the Temporal UI
+
+| Where | Open | What you see |
+|---|---|---|
+| AWS console | **Amazon Bedrock AgentCore > Agent runtime >** your runtime | Status READY, the version, network mode PUBLIC, the DEFAULT endpoint, an idle session timeout of 15 minutes |
+| AWS console | **CloudWatch > Live Tail**, log group `/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`, filter `Invocation` | One `Invocation completed successfully (Ns)` line each time a Worker finishes its work |
+| Temporal Cloud UI | **Workflows**, Workflow Id = the session id you invoked with | The session stays Running across invocations; Event History has every turn |
+| Temporal Cloud UI | **Workers > Deployments** | Your Worker Deployment and its current version while Temporal starts the Worker (step 5) |
+| Temporal Cloud UI | The follow-up session, **Event History** | `TimerStarted`, about 90 seconds with nothing, `TimerFired`, then the Activities of the follow-up turn |
+
+![CloudWatch Live Tail filtered on Invocation](docs/agentcore-live-tail.svg)
+
+### AWS Lambda
+
+With [Serverless Workers on AWS Lambda](https://docs.temporal.io/serverless-workers/aws-lambda) (Public Preview), Temporal invokes a Lambda function when Tasks arrive. Each invocation stays inside the 15-minute limit; the Workflow does not care, because its state is in Temporal. This repo does not include a Lambda deployment. For Python, see [the `lambda_worker` package](https://docs.temporal.io/develop/python/workers/serverless-workers/aws-lambda).
+
 ## Where Temporal plugs in
 
 These are the places where the demo adds Temporal to an existing agent loop. Everything else is ordinary agent code.
@@ -368,13 +469,6 @@ For TypeScript, see the [TypeScript integrations list](https://docs.temporal.io/
 
 To stream model output to a client while the turn runs, the Strands integration can [stream agent output to clients](https://docs.temporal.io/develop/python/integrations/strands-agents#stream-agent-output-to-clients). It is part of the Public Preview integration, and this demo does not use it.
 
-## Run the Worker serverless
-
-The Worker holds no state, so it can run on compute that starts and stops.
-
-- **AWS Lambda.** With [Serverless Workers on AWS Lambda](https://docs.temporal.io/serverless-workers/aws-lambda) (Public Preview), Temporal invokes your Lambda function when Tasks arrive. Each invocation stays inside the 15-minute limit; the Workflow does not care, because its state is in Temporal. This repo does not include a Lambda deployment. For Python, see [the `lambda_worker` package](https://docs.temporal.io/develop/python/workers/serverless-workers/aws-lambda).
-- **Amazon Bedrock AgentCore Runtime.** [`deploy/agentcore/`](deploy/agentcore/README.md) hosts this same session Workflow in AgentCore, with no persistent Worker. [Serverless Workers on AgentCore Runtime](https://docs.temporal.io/serverless-workers/agentcore) are in **Pre-release**.
-
 ## Patterns used
 
 Each pattern below is in the code; the link goes to its Temporal pattern page.
@@ -441,6 +535,31 @@ Ports: dashboard 8080, gateway 8090, harnesses 8091 and 8092, dev server 7233, T
 - **"No messages yet" while the Worker is down.** The transcript comes from a Query, which a Worker answers. The dashboard shows only what it cached while the Worker was up, so open a session before you kill the Worker. Show seeded sessions (beat 3) in the Temporal UI.
 - **The replacement Worker keeps running.** `beat.py --kill` starts a Worker that `run.sh` does not own. Ctrl-C on `run.sh` does not stop it; run the `kill <pid>` that `beat.py` printed.
 - **The `tool call` row reads `pending`.** Its outcome is on the `tool result` row below it.
+
+## Further reading
+
+Docs pages are kept current. Blog posts and articles show their publish date.
+
+**Durable agents with Temporal**
+
+- [Strands Agents integration](https://docs.temporal.io/develop/python/integrations/strands-agents) (docs, Public Preview): the plugin this repo uses.
+- [Durable agent with MCP and Activity-backed tools, using the Strands Agents SDK](https://docs.temporal.io/ai/cookbook/strands-agents-python) (cookbook).
+- [Better together: the durability layer for your AWS agentic stack](https://temporal.io/blog/the-durability-layer-for-your-aws-agentic-stack) (Temporal blog, August 20, 2026): a Strands agent on Bedrock and Lambda that resumes after a crash.
+- [Temporal Agent Harness: an early look at durable agent infrastructure](https://temporal.io/blog/temporal-agent-harness-durable-agent-infrastructure) (Temporal blog, August 20, 2026; earlier than Public Preview).
+
+**Serverless Workers and AgentCore**
+
+- [Run durable AI agents on Amazon Bedrock AgentCore with Temporal Serverless Workers](https://temporal.io/blog/amazon-bedrock-agentcore-with-temporal-serverless-workers) (Temporal blog, September 21, 2026).
+- [Build a durable agent on Amazon Bedrock AgentCore](https://docs.temporal.io/guides/durable-agent-on-agentcore) (docs guide) and its [Python sample](https://github.com/temporalio/samples-python/tree/main/bedrock_agentcore/strands_agent).
+- [Serverless Workers on Amazon Bedrock AgentCore Runtime](https://docs.temporal.io/serverless-workers/agentcore) (docs, Pre-release): Worker Versioning, the runtime session lifecycle and autoscaling.
+- [Introducing Temporal Serverless Workers: deploy Temporal Workers to AWS Lambda](https://temporal.io/blog/introducing-temporal-serverless-workers-deploy-temporal-workers-to-aws-lambda) (Temporal blog, updated July 17, 2026).
+- [How Temporal uses Amazon Bedrock AgentCore to create robust AI systems](https://aws.amazon.com/blogs/apn/how-temporal-uses-amazon-bedrock-agentcore-to-create-robust-ai-systems/) (AWS Partner Network blog, April 27, 2026).
+- [Amazon Bedrock AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html) (AWS docs).
+
+**Temporal concepts used here**
+
+- [Event History](https://docs.temporal.io/encyclopedia/event-history), [Timers](https://docs.temporal.io/workflow-execution/timers-delays), [message passing](https://docs.temporal.io/encyclopedia/workflow-message-passing), [Search Attributes](https://docs.temporal.io/search-attribute), [Worker Versioning](https://docs.temporal.io/worker-versioning) and [Standalone Activities](https://docs.temporal.io/standalone-activity).
+- [Announcing new Temporal capabilities from Replay 2026](https://temporal.io/blog/replay-2026-product-announcements) (Temporal blog, May 6, 2026). Release stages have moved since; the table in [Release stages](#release-stages) is current.
 
 ## Repo map
 
