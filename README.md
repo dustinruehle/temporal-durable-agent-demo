@@ -1,23 +1,36 @@
 # Temporal durable agent demo
 
-An AI agent session that survives Worker crashes, waits hours or days with no Worker running, and parks on a human approval, with no rehydration code to write.
+An AI agent session that survives Worker crashes, waits hours or days with no Worker running, and parks on a human approval, with no rehydration code to write. Run its Worker on your own machine or serverless on Amazon Bedrock AgentCore Runtime, with the same code.
 
-The agent loop is an open source [Strands](https://strandsagents.com) agent. [Temporal](https://docs.temporal.io/temporal) wraps it: the session is a Workflow, and every model call and tool call is an Activity. You can run it on your laptop with no keys, against Amazon Bedrock and Temporal Cloud, or with the Worker on Amazon Bedrock AgentCore Runtime, where Temporal starts the Worker only when there is work.
+[Temporal](https://docs.temporal.io/temporal) holds the session: the session is a Workflow, and every model call and tool call is an Activity. The Worker that runs this code holds no state, so you choose where it runs. The same code runs both ways:
 
-![What runs where](docs/what-runs-where.svg)
+| | Local Worker | Serverless Worker on Amazon Bedrock AgentCore Runtime ([Pre-release](https://docs.temporal.io/serverless-workers/agentcore)) |
+|---|---|---|
+| **Where the Worker runs** | A long-running process on your laptop or server | A short-lived Worker inside an AgentCore microVM in your AWS account |
+| **What starts the Worker** | You do | An invocation: from your own caller, or from Temporal itself when a Task waits and no Worker polls |
+| **Between turns** | The Worker stays up and polls | No Worker runs. The session waits in Temporal Cloud |
+| **A follow-up due in 3 days** | The running Worker sends it | Temporal starts a Worker when the Timer fires, and that Worker sends it |
+| **Where the session lives** | Temporal: the local dev server or Temporal Cloud | Temporal Cloud |
+| **You watch it in** | The demo dashboard and the Temporal UI | The Temporal Cloud UI and the AWS console (AgentCore runtime, CloudWatch Live Tail) |
+| **Try it** | [Paths 1 and 2](#pick-your-path) | [Path 3](#path-3-run-the-worker-on-amazon-bedrock-agentcore) |
+
+| Local Worker | Serverless Worker on AgentCore Runtime |
+|---|---|
+| ![Local Worker: what runs where](docs/what-runs-where.svg) | ![AgentCore Runtime: what runs where](docs/agentcore-what-runs-where.svg) |
+
+Select a diagram to open it full size.
+
+The agent loop is an open source [Strands](https://strandsagents.com) agent, run through the [Strands Agents integration](https://docs.temporal.io/develop/python/integrations/strands-agents) (Public Preview). Strands is not required: to bring your own agent loop, go to [Plug in your own agent loop](#plug-in-your-own-agent-loop).
 
 ## Pick your path
 
 | Path | You need | Time | You watch it in |
 |---|---|---|---|
-| **1. Laptop, mock mode** | [uv](https://docs.astral.sh/uv/), the [Temporal CLI](https://docs.temporal.io/cli), `git`. No keys. | 5 minutes | The demo dashboard and the local Temporal UI |
-| **2. Live: Amazon Bedrock and Temporal Cloud** | Path 1, plus a Temporal Cloud Namespace and API key, and AWS credentials with Bedrock model access | 15 minutes | The dashboard and the Temporal Cloud UI |
-| **3. Serverless on Amazon Bedrock AgentCore** | Path 2, plus Docker with `buildx`, rights to create an ECR repo, IAM roles and an AgentCore runtime, and Temporal Cloud access to the Pre-release | 45 minutes | The Temporal Cloud UI and the AWS console (AgentCore, CloudWatch) |
+| **1. Local Worker, mock mode** | [uv](https://docs.astral.sh/uv/), the [Temporal CLI](https://docs.temporal.io/cli), `git`. No keys. | 5 minutes | The demo dashboard and the local Temporal UI |
+| **2. Local Worker, live: Amazon Bedrock and Temporal Cloud** | Path 1, plus a Temporal Cloud Namespace and API key, and AWS credentials with Bedrock model access | 15 minutes | The dashboard and the Temporal Cloud UI |
+| **3. Serverless Worker on Amazon Bedrock AgentCore Runtime** (Pre-release) | Path 2, plus Docker with `buildx`, rights to create an ECR repo, IAM roles and an AgentCore runtime, and Temporal Cloud access to the Pre-release | 45 minutes | The Temporal Cloud UI and the AWS console (AgentCore, CloudWatch) |
 
-Start with path 1. Each path adds to the one before it, and the same code runs in all three.
-
-> [!NOTE]
-> To bring your own agent loop instead of Strands, go to [Plug in your own agent loop](#plug-in-your-own-agent-loop).
+Start with path 1. Each path adds to the one before it, and the same code runs in all three. Paths 1 and 2 run a local Worker; path 3 moves that Worker into AgentCore Runtime.
 
 ## Contents
 
@@ -27,7 +40,7 @@ Start with path 1. Each path adds to the one before it, and the same code runs i
 4. [Path 2: Live mode, Amazon Bedrock and Temporal Cloud](#live-mode-amazon-bedrock-and-temporal-cloud)
 5. [Run the beats](#run-the-beats)
 6. [Watch it in the Temporal UI](#watch-it-in-the-temporal-ui)
-7. [Path 3: Run the Worker on Amazon Bedrock AgentCore](#path-3-run-the-worker-on-amazon-bedrock-agentcore)
+7. [Path 3: Run the Worker serverless on Amazon Bedrock AgentCore Runtime](#path-3-run-the-worker-on-amazon-bedrock-agentcore)
 8. [Where Temporal plugs in](#where-temporal-plugs-in)
 9. [Plug in your own agent loop](#plug-in-your-own-agent-loop)
 10. [Patterns used](#patterns-used)
